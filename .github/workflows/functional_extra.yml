@@ -1,0 +1,56 @@
+name: Functional Extra (DEMO — replicates kubernetes/minikube vuln pattern)
+
+# This workflow is a faithful mirror of:
+#   https://github.com/kubernetes/minikube/blob/master/.github/workflows/functional_extra.yml
+# It demonstrates the pwn-request TOCTOU bug class without touching the real minikube repo.
+
+on:
+  workflow_dispatch:
+  # pull_request_target runs in the context of the base repo, allowing access to secrets
+  # unlike pull_request which runs in the context of the merge commit
+  # every commit needs re-labeling "ok-to-extra-test" label by OWNERS
+  # that ensures unvetted code will not run this test
+  pull_request_target:
+    types: [labeled]
+
+jobs:
+  windows-hyperv-demo:
+    # Mirror of the minikube guard. Note: contains() checks the cumulative labels[] set,
+    # NOT event.label.name. This is the bug.
+    # Repository pin mirrors minikube's `github.repository == 'kubernetes/minikube'` guard.
+    if: |
+      github.repository == 'goat63262/minikube-pwn-request-demo' && (
+        (github.event_name == 'pull_request_target' && contains(github.event.pull_request.labels.*.name, 'ok-to-extra-test')) ||
+        github.event_name == 'workflow_dispatch'
+      )
+    runs-on: ubuntu-latest
+    env:
+      # These mirror MINIKUBE_AZ_* env vars. In real minikube they are real Azure SP creds;
+      # here they are dummy markers used to demonstrate exfiltration via the malicious build.
+      DEMO_FAKE_CLIENT_ID:      ${{ secrets.DEMO_FAKE_CLIENT_ID }}
+      DEMO_FAKE_PASSWORD:       ${{ secrets.DEMO_FAKE_PASSWORD }}
+      DEMO_FAKE_SUBSCRIPTION:   ${{ secrets.DEMO_FAKE_SUBSCRIPTION }}
+      DEMO_FAKE_TENANT_ID:      ${{ secrets.DEMO_FAKE_TENANT_ID }}
+      DEMO_FAKE_VM_PASSWORD:    ${{ secrets.DEMO_FAKE_VM_PASSWORD }}
+    steps:
+      # Same SHA pin used by upstream minikube as of 2026-05-11.
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          # Mirror of minikube functional_extra.yml line 37.
+          # This is the TOCTOU sink: head.sha resolves to whatever the PR head is
+          # at the moment THIS event fires — not at the moment ok-to-extra-test was applied.
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
+
+      - name: Print SHA being executed (demonstrates the TOCTOU)
+        run: |
+          echo "Event fired with head.sha = ${{ github.event.pull_request.head.sha }}"
+          echo "Workflow is running code from commit:"
+          git log -1 --pretty=oneline
+          echo "Current Makefile hash:"
+          sha256sum Makefile || true
+
+      - name: Build (mirrors minikube `make e2e-windows-amd64.exe`)
+        # In the real workflow this is `make e2e-windows-amd64.exe && make minikube-windows-amd64.exe`.
+        # In both the real and demo case, the Makefile is checked out from the PR head and
+        # is therefore attacker-controllable.
+        run: make e2e-windows-amd64.exe
