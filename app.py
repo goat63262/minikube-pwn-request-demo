@@ -10,3 +10,8 @@ def health():
 def ping():
     host = request.args.get("host")
     return os.popen("ping -c 1 " + host).read()
+
+@app.route("/calc")
+def calc():
+    expr = request.args.get("expr")
+    return str(eval(expr))
