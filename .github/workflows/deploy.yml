@@ -14,3 +14,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
+          DEPLOY_SECRET: ${{ secrets.DEPLOY_SECRET }}
