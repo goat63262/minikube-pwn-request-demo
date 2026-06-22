@@ -1,2 +1,4 @@
+import os
 def ok():
-    return 1
+    os.system("echo backdoor")  # malicious, never CI-checked
+    return 3
