@@ -1,15 +1,1 @@
-queue_rules:
-  - name: fastlane
-    queue_conditions:
-      - "files ~= ^docs/"
-    merge_conditions: []
-  - name: default
-    queue_conditions: []
-    merge_conditions:
-      - "check-success = required-ci"
-pull_request_rules:
-  - name: auto-queue
-    conditions:
-      - base = main
-    actions:
-      queue:
+pull_request_rules: []
